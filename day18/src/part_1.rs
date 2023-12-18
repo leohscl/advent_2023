@@ -69,27 +69,57 @@ fn get_index_iterator(
             )
         }
     };
+    dbg!(current_h, current_w);
+    dbg!(dir);
     (new_h, new_w, new_iter)
 }
 
 impl Grid {
     fn initialize_grid(input: &str) -> (Grid, i32, i32) {
         let line_iterator = input.split_terminator('\n').map(|line| parse_line(line));
-        let filter_direction = |dir: Direction| {
-            line_iterator
-                .clone()
-                .filter_map(|(d, num)| if dir == d { Some(num) } else { None })
-                .sum::<i32>()
-        };
-        let (count_left, count_right, count_up, count_down) = (
-            filter_direction(Direction::Left),
-            filter_direction(Direction::Right),
-            filter_direction(Direction::Up),
-            filter_direction(Direction::Down),
-        );
-        let height = (count_up + count_down) * 2;
-        let width = (count_left + count_right) * 2;
-
+        let coords_iter = line_iterator.scan((0, 0), |acc, (dir, num)| {
+            match dir {
+                Direction::Left => {
+                    acc.1 -= num;
+                }
+                Direction::Right => {
+                    acc.1 += num;
+                }
+                Direction::Down => {
+                    acc.0 += num;
+                }
+                Direction::Up => {
+                    acc.0 -= num;
+                }
+            }
+            Some(acc.clone())
+        });
+        let min_w = coords_iter
+            .clone()
+            .min_by(|p1, p2| p1.1.cmp(&p2.1))
+            .unwrap()
+            .1;
+        let max_w = coords_iter
+            .clone()
+            .max_by(|p1, p2| p1.1.cmp(&p2.1))
+            .unwrap()
+            .1;
+        let min_h = coords_iter
+            .clone()
+            .min_by(|p0, p2| p0.0.cmp(&p2.0))
+            .unwrap()
+            .0;
+        let max_h = coords_iter
+            .clone()
+            .max_by(|p0, p2| p0.0.cmp(&p2.0))
+            .unwrap()
+            .0;
+        dbg!(max_h);
+        dbg!(min_h);
+        let height = max_h - min_h + 1;
+        let width = max_w - min_w + 1;
+        dbg!(height);
+        dbg!(width);
         let elements = vec![Elements::Empty; (height * width) as usize];
         (
             Grid {
@@ -97,8 +127,8 @@ impl Grid {
                 width,
                 elements,
             },
-            count_up,
-            count_left,
+            -min_h,
+            -min_w,
         )
     }
     fn print_dug(&self) {
@@ -189,6 +219,7 @@ impl Grid {
                     }
                 }
                 reachable.remove(&reach_index);
+                dbg!(visited.len());
             }
             visited
                 .iter()
@@ -219,6 +250,6 @@ fn main() {
     grid.dig_with_plan(input, height_start, width_start);
     // grid.print_dug();
     grid.carve_lake();
-    // grid.print_dug();
+    grid.print_dug();
     dbg!(grid.score());
 }
