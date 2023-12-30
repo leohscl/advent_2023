@@ -4,95 +4,137 @@ use derive_more::Add;
 use derive_more::Mul;
 use derive_more::Sub;
 
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Sub, Mul, Add, Ord)]
-struct Point {
-    x: i32,
-    y: i32,
-    // z: i32,
+#[derive(Debug, Clone, PartialEq, PartialOrd, Sub, Mul, Add)]
+struct Point<T> {
+    x: T,
+    y: T,
+    // z: f64,
 }
 
 struct Area {
-    c1: Point,
-    c2: Point,
+    min: f64,
+    max: f64,
 }
 
-impl Point {
-    fn checked_div(&self, other: &Point) -> Option<Point> {
-        let x = self.x.checked_div(other.x)?;
-        let y = self.y.checked_div(other.y)?;
-        // let z = self.z.checked_div(other.z)?;
-        // Some(Point { x, y, z })
-        Some(Point { x, y })
+impl Point<i64> {
+    fn is_parallel(&self, other: &Point<i64>) -> bool {
+        if other.x == 0 || other.y == 0 {
+            panic!();
+        }
+        self.x * other.x == self.y * other.y
     }
-
+}
+impl Point<f64> {
     fn in_area(&self, area: &Area) -> bool {
-        &area.c1 <= self && self <= &area.c2
+        area.min <= self.x && self.x <= area.max && area.min <= self.y && self.y <= area.max
     }
 }
 
+#[derive(Debug)]
 struct Hailstone {
-    start: Point,
-    trajectory: Point,
+    start: Point<i64>,
+    trajectory: Point<i64>,
 }
 
 impl FromStr for Hailstone {
     type Err = ();
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        todo!()
+        let mut iter_num = s.split(" @ ").flat_map(|s| {
+            s.split([',', ' '])
+                .filter(|t| t != &"")
+                .map(|n| n.parse::<i64>().unwrap())
+        });
+        let (xp, yp, _zp) = (
+            iter_num.next().unwrap(),
+            iter_num.next().unwrap(),
+            iter_num.next().unwrap(),
+        );
+        let (xt, yt, _zt) = (
+            iter_num.next().unwrap(),
+            iter_num.next().unwrap(),
+            iter_num.next().unwrap(),
+        );
+        let start = Point { x: xp, y: yp };
+        let trajectory = Point { x: xt, y: yt };
+        Ok(Hailstone { start, trajectory })
     }
 }
 impl Hailstone {
-    fn intersect(&self, other: &Hailstone) -> Option<Point> {
-        let div = self
-            .trajectory
-            .checked_div(&other.trajectory)
-            .expect("Should not be 0");
-        if div.x == div.y {
-            dbg!("parallel paths");
+    fn intersect(&self, other: &Hailstone) -> Option<Point<f64>> {
+        if self.trajectory.is_parallel(&other.trajectory) {
+            println!("parallel paths");
             return None;
         }
-        let diff_start = other.start.clone() - self.start.clone();
-        let trajectory_gain = self.trajectory.clone() - other.trajectory.clone();
-        // x1 + xv1t1 = x2 + xv2t2
-        // dx = - traj_1_x * t1 + traj_2_x * t2
-        // t1 = t2 * traj_2_x / traj_1_x - dx / traj_1_x
-        // dy = - traj_1_y * t1 + traj_2_y * t2
-        // dy / traj_2_y + t1 * traj_1_y / traj_2_y * traj_2_x = t2
-        // dy / traj_2_y + (t2 * traj_2_x / traj_1_x - dx / traj_1_x) * traj_1_y / traj_2_y * traj_2_x = t2
-        // dy / traj_2_y +  - dx / traj_1_x * traj_1_y / traj_2_y * traj_2_x = t2 - t2 * traj_2_x / traj_1_x * traj_1_y / traj_2_y * traj_2_x
-        // let t_ns = diff_start.checked_div(&trajectory_gain).exp();
-        todo!()
+        let x1 = self.start.x as f64;
+        let x2 = other.start.x as f64;
+        let y1 = self.start.y as f64;
+        let y2 = other.start.y as f64;
+        let v1x = self.trajectory.x as f64;
+        let v2x = other.trajectory.x as f64;
+        let v1y = self.trajectory.y as f64;
+        let v2y = other.trajectory.y as f64;
+        let t2_num = x2 - x1 + (y1 - y2) * v1x / v1y;
+        let t2_den = v2y / v1y * v1x - v2x;
+        let t2 = t2_num / t2_den;
+        let x_cross = x2 + t2 * v2x;
+        let y_cross = y2 + t2 * v2y;
+        let t1 = (y2 + t2 * v2y - y1) / v1y;
+        if t2 < 0f64 || t1 < 0f64 {
+            println!("Past");
+            return None;
+        }
+        // let x_cross = x1 + t1 * v1x;
+        // let y_cross = y1 + t1 * v1y;
+        // dbg!(x_cross);
+        // dbg!(y_cross);
+        Some(Point {
+            x: x_cross,
+            y: y_cross,
+        })
     }
 }
 
 fn main() {
     let input = include_str!("../input_test.txt");
+    // let input = include_str!("../input.txt");
+
     let hailstones: Vec<Hailstone> = input
         .split_terminator('\n')
         .map(|s| Hailstone::from_str(s).unwrap())
         .collect();
 
+    dbg!(&hailstones);
+
     let area = Area {
-        c1: Point { x: 7, y: 7 },
-        c2: Point { x: 27, y: 27 },
+        min: 7f64,
+        max: 27f64,
     };
-    let sum_in_area: u64 = (0..hailstones.len())
+
+    // let area = Area {
+    //     min: 200000000000000f64,
+    //     max: 400000000000000f64,
+    // };
+
+    let sum_in_area: i64 = (0..hailstones.len())
         .map(|h_i| {
-            (0..hailstones.len())
-                .filter(|h_j| h_i != *h_j)
+            (h_i + 1..hailstones.len())
                 .map(|h_j| {
                     if let Some(p) = hailstones[h_i].intersect(&hailstones[h_j]) {
                         if p.in_area(&area) {
+                            // dbg!(p);
+                            // println!("inside");
                             1
                         } else {
+                            // dbg!(p);
+                            // println!("outside");
                             0
                         }
                     } else {
                         0
                     }
                 })
-                .sum::<u64>()
+                .sum::<i64>()
         })
-        .sum::<u64>();
+        .sum::<i64>();
     dbg!(sum_in_area);
 }
