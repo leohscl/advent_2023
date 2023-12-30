@@ -107,7 +107,7 @@ impl Grid {
                 .map(|e| match e.mark {
                     Mark::Loop => 'L',
                     Mark::Outside => 'O',
-                    Mark::Blank => '.',
+                    Mark::Blank => 'B',
                     Mark::Inside => 'I',
                     Mark::Duplicated => 'D',
                 })
@@ -148,15 +148,16 @@ impl Grid {
         let mut current_direction = N;
         let all_directions = [N, E, S, W];
         for potential_direction_start in all_directions {
-            let potential_new_index = self
-                .get_new_index(start_index, potential_direction_start)
-                .unwrap();
-            if self.elements[potential_new_index]
-                .pipe
-                .has_cardinal(potential_direction_start.opposite())
+            if let Some(potential_new_index) =
+                self.get_new_index(start_index, potential_direction_start)
             {
-                current_direction = potential_direction_start;
-                break;
+                if self.elements[potential_new_index]
+                    .pipe
+                    .has_cardinal(potential_direction_start.opposite())
+                {
+                    current_direction = potential_direction_start;
+                    break;
+                }
             }
         }
         let start_direction = current_direction;
@@ -190,6 +191,20 @@ impl Grid {
             pipe: pipe_start,
             mark: Mark::Loop,
         };
+        self.elements = self
+            .elements
+            .iter()
+            .map(|m_p| {
+                if m_p.mark != Mark::Loop {
+                    MarkedPipe {
+                        pipe: Ground,
+                        mark: Mark::Blank,
+                    }
+                } else {
+                    m_p.clone()
+                }
+            })
+            .collect();
         steps
     }
 
@@ -216,16 +231,24 @@ impl Grid {
             .chunks(self.width)
             .flat_map(|chunk| {
                 let iter_new_chunk = chunk.into_iter().map(|marked_pipe| {
-                    let new_pipe = match marked_pipe.pipe {
-                        WE => Ground,
-                        SW => NS,
-                        SE => NS,
-                        NE => Ground,
-                        NW => Ground,
-                        _ => marked_pipe.pipe,
+                    let new_pipe = if marked_pipe.mark == Mark::Loop {
+                        match marked_pipe.pipe {
+                            WE => Ground,
+                            SW => NS,
+                            SE => NS,
+                            NE => Ground,
+                            NW => Ground,
+                            _ => marked_pipe.pipe,
+                        }
+                    } else {
+                        marked_pipe.pipe
+                    };
+                    let new_mark = match new_pipe {
+                        Ground => Mark::Duplicated,
+                        _ => marked_pipe.mark,
                     };
                     MarkedPipe {
-                        mark: Mark::Duplicated,
+                        mark: new_mark,
                         pipe: new_pipe,
                     }
                 });
@@ -235,16 +258,24 @@ impl Grid {
         let duplicated_cols = duplicated_rows
             .into_iter()
             .flat_map(|marked_pipe| {
-                let new_pipe = match marked_pipe.pipe {
-                    NS => Ground,
-                    SE => WE,
-                    NE => WE,
-                    NW => Ground,
-                    SW => Ground,
-                    _ => marked_pipe.pipe,
+                let new_pipe = if marked_pipe.mark == Mark::Loop {
+                    match marked_pipe.pipe {
+                        NS => Ground,
+                        SE => WE,
+                        NE => WE,
+                        NW => Ground,
+                        SW => Ground,
+                        _ => marked_pipe.pipe,
+                    }
+                } else {
+                    marked_pipe.pipe
+                };
+                let new_mark = match new_pipe {
+                    Ground => Mark::Duplicated,
+                    _ => marked_pipe.mark,
                 };
                 let new_marked_pipe = MarkedPipe {
-                    mark: Mark::Duplicated,
+                    mark: new_mark,
                     pipe: new_pipe,
                 };
                 [marked_pipe, new_marked_pipe].into_iter()
@@ -267,7 +298,7 @@ impl Grid {
             .iter()
             .enumerate()
             .find_map(|(i, marked_pipe)| {
-                if marked_pipe.mark == Mark::Blank {
+                if marked_pipe.mark == Mark::Blank && marked_pipe.pipe == Pipe::Ground {
                     Some(i)
                 } else {
                     None
@@ -298,7 +329,8 @@ impl Grid {
                 }
             }
             for elt_index in visited_index {
-                if self.elements[elt_index].mark == Mark::Blank {
+                let marked_pipe = self.elements[elt_index];
+                if marked_pipe.mark == Mark::Blank && marked_pipe.pipe == Pipe::Ground {
                     self.elements[elt_index].mark = mark_variant;
                 }
             }
@@ -313,8 +345,10 @@ fn main() {
     // let input = include_str!("../input_test_1.txt");
     // let input = include_str!("../input_test_2.txt");
     // let input = include_str!("../input_test_3.txt");
-    let input = include_str!("../input_test_4.txt");
-    // let input = include_str!("../input.txt");
+    // let input = include_str!("../input_test_4.txt");
+    // let input = include_str!("../input_test_5.txt");
+    // let input = include_str!("../input_test_6.txt");
+    let input = include_str!("../input.txt");
     let height = input.split_terminator('\n').count();
     let width = input.split('\n').next().unwrap().chars().count();
     let elements = input
@@ -328,21 +362,24 @@ fn main() {
             }
         })
         .collect();
-    let grid = Grid {
+    let mut grid = Grid {
         height,
         width,
         elements,
     };
+    grid.mark_loop();
+    // grid.print_grid_marks();
+    grid.print_grid_elements();
     let mut extended_grid = grid.extend_grid();
-    extended_grid.mark_loop();
     extended_grid.print_grid_elements();
     extended_grid.print_grid_marks();
+    // // extended_grid.mark_loop();
     while extended_grid.try_mark() {}
-    extended_grid.print_grid_marks();
-    // let count_i = grid
-    //     .elements
-    //     .into_iter()
-    //     .filter(|m_p| m_p.mark == Mark::Inside)
-    //     .count();
-    // dbg!(count_i);
+    // extended_grid.print_grid_marks();
+    let count_i = extended_grid
+        .elements
+        .into_iter()
+        .filter(|m_p| m_p.mark == Mark::Inside)
+        .count();
+    dbg!(count_i);
 }

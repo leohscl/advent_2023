@@ -1,0 +1,22 @@
+[package]
+name = "day16"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+[[bin]]
+name = "part_1"
+path = "src/part_1.rs"
+[[bin]]
+name = "part_2"
+path = "src/part_2.rs"
+
+[[bench]]
+name = "example"
+harness = false
+
+[dev-dependencies]
+divan = "0.1.7"
+
+[dependencies]
+itertools = "*"
